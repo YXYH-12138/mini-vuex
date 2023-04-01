@@ -1,0 +1,16 @@
+*.sh
+node_modules
+lib
+*.md
+*.scss
+*.woff
+*.ttf
+.vscode
+.idea
+dist
+public
+
+auto-imports.d.ts
+components.d.ts
+
+src/types/*
