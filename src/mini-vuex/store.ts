@@ -1,6 +1,6 @@
 import { type App, reactive, type InjectionKey } from "vue";
 import { storeKey } from "./injectKey";
-import { forEachValue, isFunction, unifyObjectStyle } from "./utils";
+import { forEachValue, isFunction, isPromise, unifyObjectStyle } from "./utils";
 
 export interface Payload {
 	type: string;
@@ -61,8 +61,8 @@ export class Store<S> {
 	}
 
 	constructor(options: StoreOptions<S>) {
-		const { state, mutations, actions, getters } = options || { state: {} };
-		this._state.data = (isFunction(state) ? state() : state) as S;
+		const { state, mutations, actions, getters } = options;
+		this._state.data = (isFunction(state) ? state() : state || {}) as S;
 		this._mutations = mutations || Object.create(null);
 		this._actions = actions || Object.create(null);
 
@@ -88,9 +88,10 @@ export class Store<S> {
 		this._mutations[type](this.state, payload);
 	};
 
-	public dispatch: Dispatch = async (_type: string | Payload, _payload?: any) => {
+	public dispatch: Dispatch = (_type: string | Payload, _payload?: any) => {
 		const { type, payload } = unifyObjectStyle(_type, _payload);
-		this._actions[type].call(this, this, payload);
+		const result = this._actions[type].call(this, this, payload);
+		return isPromise(result) ? result : Promise.resolve();
 	};
 }
 

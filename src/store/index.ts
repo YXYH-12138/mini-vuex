@@ -1,6 +1,6 @@
 import type { InjectionKey } from "vue";
-// import { createStore, useStore as useBaseStore, type Store } from "../mini-vuex";
-import { createStore, useStore as useBaseStore, type Store } from "vuex";
+import { createStore, useStore as useBaseStore, type Store } from "../mini-vuex";
+// import { createStore, useStore as useBaseStore, type Store } from "vuex";
 
 interface State {
 	count: number;
@@ -29,10 +29,12 @@ export const store = createStore({
 	},
 	actions: {
 		asyncIncrement({ commit }) {
-			console.log(this);
-			setTimeout(() => {
-				commit("increment");
-			}, 1000);
+			return new Promise<void>((resolve) => {
+				setTimeout(() => {
+					commit("increment");
+					resolve();
+				}, 1000);
+			});
 		}
 	}
 });

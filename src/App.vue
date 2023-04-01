@@ -14,17 +14,22 @@ import { useStore } from "./store";
 
 const store = useStore();
 
-const counter = computed(() => store.getters.double);
+const counter = computed(() => {
+	return store.state.count;
+});
 
 function handleAdd() {
 	store.commit("increment");
+	store.commit({ type: "increment" });
 }
 function handleSub() {
 	store.commit("decrement");
 	store.commit({ type: "decrement" });
 }
 function handleAsyncAdd() {
-	store.dispatch("asyncIncrement");
+	store.dispatch("asyncIncrement").then(() => {
+		console.log(111);
+	});
 }
 </script>
 
