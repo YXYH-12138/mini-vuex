@@ -8,7 +8,7 @@ interface State {
 
 export const key: InjectionKey<Store<State>> = Symbol();
 
-export const store = createStore<State>({
+export const store = createStore({
 	state() {
 		return {
 			count: 0

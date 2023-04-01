@@ -1,6 +1,6 @@
-import { type App, reactive } from "vue";
+import { type App, reactive, type InjectionKey } from "vue";
 import { storeKey } from "./injectKey";
-import { forEachValue, isFunction } from "./utils";
+import { forEachValue, isFunction, unifyObjectStyle } from "./utils";
 
 export interface Payload {
 	type: string;
@@ -51,8 +51,8 @@ export interface StoreOptions<S> {
 
 export class Store<S> {
 	private _state = reactive({ data: {} }) as { data: S };
-	private _mutations: MutationTree<S> = Object.create(null);
-	private _actions: ActionTree<S, S> = Object.create(null);
+	private _mutations: MutationTree<S>;
+	private _actions: ActionTree<S, S>;
 
 	public readonly getters: Record<string, any> = {};
 
@@ -63,8 +63,8 @@ export class Store<S> {
 	constructor(options: StoreOptions<S>) {
 		const { state, mutations, actions, getters } = options || { state: {} };
 		this._state.data = (isFunction(state) ? state() : state) as S;
-		Object.assign(this._mutations, mutations);
-		Object.assign(this._actions, actions);
+		this._mutations = mutations || Object.create(null);
+		this._actions = actions || Object.create(null);
 
 		if (getters) {
 			forEachValue(getters, (value, key) => {
@@ -78,27 +78,19 @@ export class Store<S> {
 		}
 	}
 
-	install(app: App, key?: string) {
+	install(app: App, key?: InjectionKey<Store<any>> | string) {
 		app.provide(key || storeKey, this);
 		app.config.globalProperties.$store = this;
 	}
 
-	public commit: Commit = (data: string | Payload, payload?: any) => {
-		if (typeof data === "string") {
-			this._mutations[data](this.state, payload);
-		} else {
-			const { type, ...payload } = data;
-			this._mutations[type](this.state, payload);
-		}
+	public commit: Commit = (_type: string | Payload, _payload?: any) => {
+		const { type, payload } = unifyObjectStyle(_type, _payload);
+		this._mutations[type](this.state, payload);
 	};
 
-	public dispatch: Dispatch = async (data: string | Payload, payload?: any) => {
-		if (typeof data === "string") {
-			this._actions[data].call(this, this, payload);
-		} else {
-			const { type, ...payload } = data;
-			this._actions[type].call(this, this, payload);
-		}
+	public dispatch: Dispatch = async (_type: string | Payload, _payload?: any) => {
+		const { type, payload } = unifyObjectStyle(_type, _payload);
+		this._actions[type].call(this, this, payload);
 	};
 }
 
