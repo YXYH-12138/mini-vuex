@@ -4,6 +4,8 @@ export const isObject = (val: unknown): val is Record<any, any> =>
 
 export const isPromise = (val: unknown) => val && isFunction((val as any)?.then);
 
+export type Fn<V = any, K = string> = (value: V, key: K) => void;
+
 export function forEachValue(data: Record<any, any>, fn: (value: any, key: string) => void) {
 	Object.keys(data).forEach((key) => fn(data[key], key));
 }

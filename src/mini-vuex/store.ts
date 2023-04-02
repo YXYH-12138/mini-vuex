@@ -1,6 +1,8 @@
 import { type App, reactive, type InjectionKey } from "vue";
 import { storeKey } from "./injectKey";
-import { forEachValue, isFunction, isPromise, unifyObjectStyle } from "./utils";
+import ModuleCollection from "./module/module-collection";
+import { installModule } from "./store-util";
+import { isPromise, unifyObjectStyle } from "./utils";
 
 export interface Payload {
 	type: string;
@@ -41,18 +43,32 @@ export interface MutationTree<S> {
 export interface ActionTree<S, R> {
 	[key: string]: ActionHandler<S, R>;
 }
+export interface ModuleTree<R> {
+	[key: string]: Module<any, R>;
+}
+export interface Module<S, R> {
+	namespaced?: boolean;
+	state?: S | (() => S);
+	getters?: GetterTree<S, R>;
+	actions?: ActionTree<S, R>;
+	mutations?: MutationTree<S>;
+	modules?: ModuleTree<R>;
+}
 
 export interface StoreOptions<S> {
 	state?: S | (() => S);
 	getters?: GetterTree<S, S>;
 	actions?: ActionTree<S, S>;
 	mutations?: MutationTree<S>;
+	modules?: ModuleTree<S>;
 }
 
 export class Store<S> {
 	private _state = reactive({ data: {} }) as { data: S };
 	private _mutations: MutationTree<S>;
 	private _actions: ActionTree<S, S>;
+
+	private _modules: ModuleCollection<S>;
 
 	public readonly getters: Record<string, any> = {};
 
@@ -61,21 +77,26 @@ export class Store<S> {
 	}
 
 	constructor(options: StoreOptions<S>) {
-		const { state, mutations, actions, getters } = options;
-		this._state.data = (isFunction(state) ? state() : state || {}) as S;
-		this._mutations = mutations || Object.create(null);
-		this._actions = actions || Object.create(null);
+		this._modules = new ModuleCollection(options);
+		console.log(this._modules);
 
-		if (getters) {
-			forEachValue(getters, (value, key) => {
-				Object.defineProperty(this.getters, key, {
-					enumerable: true,
-					get: () => {
-						return value(this.state, this.getters);
-					}
-				});
-			});
-		}
+		const state = this._modules.root.state;
+
+		installModule(state, this._modules.root, []);
+
+		this._state.data = state;
+
+		// this._state.data = (isFunction(state) ? state() : state || {}) as S;
+		// this._mutations = mutations || Object.create(null);
+		// this._actions = actions || Object.create(null);
+
+		// getters &&
+		// 	forEachValue(getters, (value, key) => {
+		// 		Object.defineProperty(this.getters, key, {
+		// 			enumerable: true,
+		// 			get: () => value(this.state, this.getters)
+		// 		});
+		// 	});
 	}
 
 	install(app: App, key?: InjectionKey<Store<any>> | string) {
