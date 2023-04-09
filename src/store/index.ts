@@ -16,14 +16,14 @@ const aCount: Module<ACount, ACount> = {
 		};
 	},
 	getters: {
-		double(state) {
-			console.log("getter");
+		double(state, getters) {
+			console.log("getter", getters);
 			return state.count * 2;
 		}
 	},
 	mutations: {
-		increment(state) {
-			state.count++;
+		increment(state, payload) {
+			state.count += payload;
 		},
 		decrement(state) {
 			state.count--;
@@ -33,7 +33,7 @@ const aCount: Module<ACount, ACount> = {
 		asyncIncrement({ commit }) {
 			return new Promise<void>((resolve) => {
 				setTimeout(() => {
-					commit("increment");
+					commit("increment", 1);
 					resolve();
 				}, 1000);
 			});
@@ -44,21 +44,21 @@ const aCount: Module<ACount, ACount> = {
 			namespaced: true,
 			state() {
 				return {
-					aacount: 0
+					count: 0
 				};
 			},
 			getters: {
-				aadouble(state) {
+				double(state) {
 					console.log("getter");
-					return state.aacount * 2;
+					return state.count * 2;
 				}
 			},
 			mutations: {
 				increment(state) {
-					state.aacount++;
+					state.count++;
 				},
 				decrement(state) {
-					state.aacount--;
+					state.count--;
 				}
 			},
 			actions: {

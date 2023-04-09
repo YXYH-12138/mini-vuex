@@ -1,27 +1,47 @@
 import { type Fn, forEachValue, isFunction } from "../utils";
-import type { StoreOptions } from "../store";
+import type { ActionHandler, Getter, Mutation, StoreOptions } from "../store";
 
 /**
  * 存储模块的基本数据结构，属性和方法
  */
 export default class Module<S> {
-	public state: S;
+	state: S;
 
-	private _raw: StoreOptions<S>;
-	private _children: Record<string, Module<S>>;
+	_rawModule: StoreOptions<S>;
+	_children: Record<string, Module<S>>;
 
-	constructor(options: StoreOptions<S>) {
-		const { state: _state } = options;
-		this._raw = options;
+	constructor(rawModule: StoreOptions<S>) {
+		const { state: _state } = rawModule;
+		this._rawModule = rawModule;
 		this.state = (isFunction(_state) ? _state() : _state || {}) as S;
 		this._children = Object.create(null);
 	}
 
-	public addChild(key: string, module: Module<S>) {
+	get namespaced() {
+		return !!this._rawModule.namespaced;
+	}
+
+	addChild(key: string, module: Module<S>) {
 		this._children[key] = module;
 	}
 
-	public forEachChild(fn: Fn<Module<S>>) {
+	getChild(key: string) {
+		return this._children[key];
+	}
+
+	forEachChild(fn: Fn<Module<S>>) {
 		forEachValue(this._children, fn);
+	}
+
+	forEachAction(fn: Fn<ActionHandler<S, S>>) {
+		forEachValue(this._rawModule.actions!, fn);
+	}
+
+	forEachMutation(fn: Fn<Mutation<S>>) {
+		forEachValue(this._rawModule.mutations!, fn);
+	}
+
+	forEachGetter(fn: Fn<Getter<S, S>>) {
+		forEachValue(this._rawModule.getters!, fn);
 	}
 }

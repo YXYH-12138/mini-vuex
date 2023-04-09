@@ -1,8 +1,7 @@
-import { type App, reactive, type InjectionKey } from "vue";
 import { storeKey } from "./injectKey";
 import ModuleCollection from "./module/module-collection";
-import { installModule } from "./store-util";
-import { isPromise, unifyObjectStyle } from "./utils";
+import { installModule, unifyObjectStyle, resetStoreState } from "./store-util";
+import type { EffectScope, App, InjectionKey } from "vue";
 
 export interface Payload {
 	type: string;
@@ -30,7 +29,7 @@ export type Getter<S, R> = (state: S, getters: any, rootState: R, rootGetters: a
 export type Mutation<S> = (state: S, payload?: any) => any;
 export type ActionHandler<S, R> = (
 	this: Store<R>,
-	injectee: ActionContext<S, R>,
+	inject: ActionContext<S, R>,
 	payload?: any
 ) => any;
 
@@ -61,42 +60,44 @@ export interface StoreOptions<S> {
 	actions?: ActionTree<S, S>;
 	mutations?: MutationTree<S>;
 	modules?: ModuleTree<S>;
+	namespaced?: boolean;
 }
 
 export class Store<S> {
-	private _state = reactive({ data: {} }) as { data: S };
-	private _mutations: MutationTree<S>;
-	private _actions: ActionTree<S, S>;
+	_state!: { data: S };
+	getters!: Record<string, any>;
+	_mutations: Record<string, Mutation<S>[]>;
+	_actions: Record<string, Array<(payload: any) => any>>;
+	_wrappedGetters: Record<string, Getter<S, S>>;
+	_makeLocalGettersCache: Record<string, Record<string, any>>;
+	_modules: ModuleCollection<S>;
 
-	private _modules: ModuleCollection<S>;
+	_scope: EffectScope | undefined;
 
-	public readonly getters: Record<string, any> = {};
-
-	public get state() {
+	get state() {
 		return this._state.data;
 	}
 
 	constructor(options: StoreOptions<S>) {
-		this._modules = new ModuleCollection(options);
-		console.log(this._modules);
+		// 初始化类部数据
+		this._mutations = Object.create(null);
+		this._actions = Object.create(null);
+		this._wrappedGetters = Object.create(null);
+		this._makeLocalGettersCache = Object.create(null);
 
+		// 会在在ModuleCollection中递归构建模块树
+		this._modules = new ModuleCollection(options);
+
+		// 根状态
 		const state = this._modules.root.state;
 
-		installModule(state, this._modules.root, []);
+		// 安装模块
+		installModule(this, state, this._modules.root, []);
+		// 初始化响应式数据和getter
+		resetStoreState(this, state);
 
-		this._state.data = state;
-
-		// this._state.data = (isFunction(state) ? state() : state || {}) as S;
-		// this._mutations = mutations || Object.create(null);
-		// this._actions = actions || Object.create(null);
-
-		// getters &&
-		// 	forEachValue(getters, (value, key) => {
-		// 		Object.defineProperty(this.getters, key, {
-		// 			enumerable: true,
-		// 			get: () => value(this.state, this.getters)
-		// 		});
-		// 	});
+		// this.rootState = state;
+		console.log(this);
 	}
 
 	install(app: App, key?: InjectionKey<Store<any>> | string) {
@@ -104,15 +105,28 @@ export class Store<S> {
 		app.config.globalProperties.$store = this;
 	}
 
-	public commit: Commit = (_type: string | Payload, _payload?: any) => {
+	commit: Commit = (_type: string | Payload, _payload?: any) => {
 		const { type, payload } = unifyObjectStyle(_type, _payload);
-		this._mutations[type](this.state, payload);
+		const entrys = this._mutations[type];
+		if (!entrys) {
+			if (process.env.NODE_ENV) {
+				console.error(`[vuex] unknown mutation type: ${type}`);
+			}
+			return;
+		}
+		entrys.forEach((fn) => fn(payload));
 	};
 
-	public dispatch: Dispatch = (_type: string | Payload, _payload?: any) => {
+	dispatch: Dispatch = (_type: string | Payload, _payload?: any) => {
 		const { type, payload } = unifyObjectStyle(_type, _payload);
-		const result = this._actions[type].call(this, this, payload);
-		return isPromise(result) ? result : Promise.resolve();
+		const entrys = this._actions[type];
+		if (!entrys) {
+			if (process.env.NODE_ENV) {
+				console.error(`[vuex] unknown action type: ${type}`);
+			}
+			return Promise.reject();
+		}
+		return Promise.all(entrys.map((fn) => fn(payload)));
 	};
 }
 
