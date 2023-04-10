@@ -84,6 +84,7 @@ export function resetStoreState(store: Store<any>, state: any) {
 
 	store._scope = scope;
 
+	// 停止之前的scope
 	oldScope && oldScope.stop();
 }
 
@@ -127,7 +128,7 @@ function makeLocalGetters(store: Store<any>, namespace: string) {
 			// 如果目标getter与此名称空间不匹配，则跳过
 			if (key.slice(0, splitPos) !== namespace) return;
 
-			// 当前(不包括命名空间的)getter类型
+			// 当前(剔除父级命名空间)getter类型
 			const type = key.slice(splitPos);
 
 			Object.defineProperty(gettersProxy, type, {
@@ -179,7 +180,7 @@ function registerAction(
 function registerGetter(
 	store: Store<any>,
 	type: string,
-	handler: Getter<any, any>,
+	rawGetter: Getter<any, any>,
 	local: LocalContext
 ) {
 	if (store._wrappedGetters[type]) {
@@ -189,7 +190,12 @@ function registerGetter(
 		return;
 	}
 	store._wrappedGetters[type] = () =>
-		handler(local.state, local.getters, store.state, store.getters);
+		rawGetter(
+			local.state, // local state
+			local.getters, // local getters
+			store.state, // root state
+			store.getters // root getters
+		);
 }
 
 function getNestedState(state: any, path: string[]) {
